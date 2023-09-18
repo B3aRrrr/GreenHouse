@@ -1,0 +1,2 @@
+model_checkpoint_path: "ddpg_SOIL_weights_actor.h5f"
+all_model_checkpoint_paths: "ddpg_SOIL_weights_actor.h5f"
