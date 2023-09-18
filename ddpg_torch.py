@@ -232,7 +232,7 @@ class AgentDDPG(object):
             self.critic = CriticNetwork(beta,input_dims,layer1_size,
                                         layer2_size,n_actions,name='Critic',chkpt_dir=agent_dir)
             self.target_critic = CriticNetwork(beta,input_dims,layer1_size,
-                                        layer2_size,n_actions,name='TargetCritic')
+                                        layer2_size,n_actions,name='TargetCritic',chkpt_dir=agent_dir)
             self.noise = OUActionNoise(mu=np.zeros(n_actions))
             
             self.update_network_parameters(tau=1)
