@@ -16,7 +16,8 @@ def plotLearning(scores, filename, x=None, window=5):
     if x is None:
         x = [i for i in range(N)]
     plt.ylabel('Score')       
-    plt.xlabel('Game')                     
+    plt.xlabel('Game') 
+    plt.grid(True)                    
     plt.plot(x, running_avg)
     plt.savefig(filename)
     
