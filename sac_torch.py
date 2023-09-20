@@ -319,10 +319,7 @@ class AgentSAC(object):
 
             s, done, current_steps = env.reset()[0], False, 0 
             
-            print(
-                f'update_every = {update_every};eval_interval = {eval_interval};save_interval = {save_interval};max_action = {max_action}'+
-                f'steps_per_epoch = {steps_per_epoch};start_steps = {start_steps};update_after = {update_after}'                
-                )
+            
             # print(f's={s}; done = {done};')
             for t in range(total_steps):
                 current_steps += 1
