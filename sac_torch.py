@@ -9,6 +9,10 @@ import argparse
 import os
 from utils import plotLearning
 
+
+
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
 def Reward_adapter(r, EnvIdex):
     # For BipedalWalker
     if EnvIdex == 0 or EnvIdex == 1:
@@ -62,9 +66,6 @@ def evaluate_policy(env, model, render, steps_per_epoch, max_action, EnvIdex):
         scores += ep_r
     return scores/turns
 
-
-
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 class RandomBuffer(object):
 	def __init__(self, state_dim, action_dim, Env_with_dead , max_size=int(1e6)):
@@ -134,6 +135,7 @@ class RandomBuffer(object):
 		self.reward = np.load("buffer/reward.npy")
 		self.next_state = np.load("buffer/next_state.npy")
 		self.dead = np.load("buffer/dead.npy")
+
 def build_net(layer_shape, activation, output_activation):
 	'''Build net with for loop'''
 	layers = []
@@ -141,56 +143,59 @@ def build_net(layer_shape, activation, output_activation):
 		act = activation if j < len(layer_shape)-2 else output_activation
 		layers += [nn.Linear(layer_shape[j], layer_shape[j+1]), act()]
 	return nn.Sequential(*layers)
+
 class Actor(nn.Module):
-	def __init__(self, state_dim, action_dim, hid_shape, h_acti=nn.ReLU, o_acti=nn.ReLU):
-		super(Actor, self).__init__()
+    def __init__(self, state_dim, action_dim, hid_shape, h_acti=nn.ReLU, o_acti=nn.ReLU):
+        super(Actor, self).__init__()
 
-		layers = [state_dim] + list(hid_shape)
-		self.a_net = build_net(layers, h_acti, o_acti)
-		self.mu_layer = nn.Linear(layers[-1], action_dim)
-		self.log_std_layer = nn.Linear(layers[-1], action_dim)
+        layers = [state_dim] + list(hid_shape)
+        self.a_net = build_net(layers, h_acti, o_acti)
+        self.mu_layer = nn.Linear(layers[-1], action_dim)
+        self.log_std_layer = nn.Linear(layers[-1], action_dim)
 
-		self.LOG_STD_MAX = 2
-		self.LOG_STD_MIN = -20
+        self.LOG_STD_MAX = 2
+        self.LOG_STD_MIN = -20
+        self.device = device;self.to(self.device)
 
+    def forward(self, state, deterministic=False, with_logprob=True):
+        '''Network with Enforcing Action Bounds'''
+        net_out = self.a_net(state)
+        mu = self.mu_layer(net_out)
+        log_std = self.log_std_layer(net_out)
+        log_std = torch.clamp(log_std, self.LOG_STD_MIN, self.LOG_STD_MAX)  #总感觉这里clamp不利于学习
+        std = torch.exp(log_std)
+        dist = Normal(mu, std)
 
-	def forward(self, state, deterministic=False, with_logprob=True):
-		'''Network with Enforcing Action Bounds'''
-		net_out = self.a_net(state)
-		mu = self.mu_layer(net_out)
-		log_std = self.log_std_layer(net_out)
-		log_std = torch.clamp(log_std, self.LOG_STD_MIN, self.LOG_STD_MAX)  #总感觉这里clamp不利于学习
-		std = torch.exp(log_std)
-		dist = Normal(mu, std)
+        if deterministic: u = mu
+        else: u = dist.rsample() #'''reparameterization trick of Gaussian'''#
+        a = torch.tanh(u)
 
-		if deterministic: u = mu
-		else: u = dist.rsample() #'''reparameterization trick of Gaussian'''#
-		a = torch.tanh(u)
+        if with_logprob:
+            # get probability density of logp_pi_a from probability density of u, which is given by the original paper.
+            # logp_pi_a = (dist.log_prob(u) - torch.log(1 - a.pow(2) + 1e-6)).sum(dim=1, keepdim=True)
 
-		if with_logprob:
-			# get probability density of logp_pi_a from probability density of u, which is given by the original paper.
-			# logp_pi_a = (dist.log_prob(u) - torch.log(1 - a.pow(2) + 1e-6)).sum(dim=1, keepdim=True)
+            # Derive from the above equation. No a, thus no tanh(h), thus less gradient vanish and more stable.
+            logp_pi_a = dist.log_prob(u).sum(axis=1, keepdim=True) - (2 * (np.log(2) - u - F.softplus(-2 * u))).sum(axis=1, keepdim=True)
+        else:
+            logp_pi_a = None
 
-			# Derive from the above equation. No a, thus no tanh(h), thus less gradient vanish and more stable.
-			logp_pi_a = dist.log_prob(u).sum(axis=1, keepdim=True) - (2 * (np.log(2) - u - F.softplus(-2 * u))).sum(axis=1, keepdim=True)
-		else:
-			logp_pi_a = None
+        return a, logp_pi_a
 
-		return a, logp_pi_a
 class Q_Critic(nn.Module):
-	def __init__(self, state_dim, action_dim, hid_shape):
-		super(Q_Critic, self).__init__()
-		layers = [state_dim + action_dim] + list(hid_shape) + [1]
+    def __init__(self, state_dim, action_dim, hid_shape):
+        super(Q_Critic, self).__init__()
+        layers = [state_dim + action_dim] + list(hid_shape) + [1]
 
-		self.Q_1 = build_net(layers, nn.ReLU, nn.Identity)
-		self.Q_2 = build_net(layers, nn.ReLU, nn.Identity)
+        self.Q_1 = build_net(layers, nn.ReLU, nn.Identity)
+        self.Q_2 = build_net(layers, nn.ReLU, nn.Identity)
 
+        self.device = device;self.to(self.device)
 
-	def forward(self, state, action):
-		sa = torch.cat([state, action], 1)
-		q1 = self.Q_1(sa)
-		q2 = self.Q_2(sa)
-		return q1, q2
+    def forward(self, state, action):
+        sa = torch.cat([state, action], 1)
+        q1 = self.Q_1(sa)
+        q2 = self.Q_2(sa)
+        return q1, q2
 class AgentSAC(object):
     def __init__(
         self,
@@ -235,6 +240,7 @@ class AgentSAC(object):
                 self.log_alpha = torch.tensor(np.log(alpha), dtype=float, requires_grad=True, device=device)
                 self.alpha_optim = torch.optim.Adam([self.log_alpha], lr=c_lr) 
             self.score_history=[]
+            
     def select_action(self, state, deterministic, with_logprob=False):
         # print(f'[AgentSAC][INPUT] state={state}')
         # only used when interact with the env
