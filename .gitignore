@@ -1,4 +1,6 @@
 plots/*
-venv/*
+.venv/*
 BipedalWalker-v3/*
 ChatGPT.pdf
+info.docx
+info.odt
