@@ -51,14 +51,10 @@ def evaluate_policy(env, model, render, steps_per_epoch, max_action, EnvIdex):
     turns = 3#opt.eval_turn
     for j in range(turns):
         s, done, ep_r = env.reset()[0], False, 0
-        while not done:
-            # Take deterministic actions at test time
-            # print(f'[evaluate_policy] s= {s}')
+        while not done: 
             a = model.select_action(s, deterministic=True, with_logprob=False)
             act = Action_adapter(a, max_action)  # [0,1] to [-max,max]
-            s_prime, r, done, info,_ = env.step(act)#s_prime, r, done, info = env.step(act)
-            # r = Reward_adapter(r, EnvIdex)
-            ep_r += r
+            s_prime, r, done, info = env.step(act,False) 
             s = s_prime
             if render:
                 env.render()
@@ -306,8 +302,9 @@ class AgentSAC(object):
         save_interval:int=int(2.5e3),# opt.save_interval  #in steps
         random_seed:int=42,
         plot:bool=True,
-        plot_path:str= os.path.join(os.getcwd(),'plots',"BipedalWalker-v3")):
-        
+        plot_path:str= os.path.join(os.getcwd(),'plots',"BipedalWalker-v3"),
+        isProfile:bool=False):
+
             if not os.path.exists(plot_path):
                     # Create a new directory because it does not exist
                     os.makedirs(plot_path)
@@ -319,13 +316,13 @@ class AgentSAC(object):
             write = True # opt.write
 
             start_steps = 5 * steps_per_epoch #in steps
-            update_after = 2 * steps_per_epoch #in steps  
+            update_after = 2 * steps_per_epoch #in steps
             eval_env = env
 
 
-            s, done, current_steps = env.reset()[0], False, 0 
-            
-            
+            s, done, current_steps = env.reset(), False, 0
+
+
             # print(f's={s}; done = {done};')
             for t in range(total_steps):
                 current_steps += 1
@@ -339,8 +336,8 @@ class AgentSAC(object):
                     # print(f'[AgentSAC] total_steps = {total_steps}; [Action_adapter];s={s[0]}; t = {t}')
                     a = self.select_action(s, deterministic=False, with_logprob=False) #a∈[-1,1]
                     act = Action_adapter(a,max_action) #act∈[-max,max]
-                
-                s_prime, r, done, info,_ = env.step(act)#s_prime, r, done, info = env.step(act)
+
+                s_prime, r, done, info = env.step(act,isProfile)#s_prime, r, done, info = env.step(act)
                 dead = Done_adapter(r, done, current_steps, EnvIdex)
                 r = Reward_adapter(r, EnvIdex)
                 replay_buffer.add(s, a, r, s_prime, dead)
@@ -366,13 +363,13 @@ class AgentSAC(object):
                         writer.add_scalar('alpha', self.alpha, global_step=t + 1)
                     print('EnvName:', EnvName[EnvIdex], 'seed:', random_seed, 'totalsteps:', t+1, 'score:', score)
                 if done:
-                    s, done, current_steps = env.reset()[0], False, 0
+                    s, done, current_steps = env.reset(), False, 0
                 self.score_history.append(r)
                 if plot:
                      if (t + 1) % save_interval == 0:
                         filename = f'{t+1}.png'
                         plotLearning(self.score_history,os.path.join(plot_path,filename),window=100)
-                
+
 
             env.close()
             eval_env.close()

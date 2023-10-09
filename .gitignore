@@ -2,5 +2,11 @@ plots/*
 .venv/*
 BipedalWalker-v3/*
 ChatGPT.pdf
-info.docx
-info.odt
+helpfull_2023_10_05.html
+Info.odt
+image.png
+SoilCntrolDemonstration.ipynb
+SoilControlModel_v2_test.ipynb
+SoilControlModelTest.ipynb
+Скорости усваивания.txt
+SoilCntrolDemonstrationSAC.ipynb
