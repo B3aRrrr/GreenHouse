@@ -414,7 +414,6 @@ class SoilGreenHouse(gym.Env, EzPickle):
             low_high_dict=self.low_high_dict,
             state=self.state,
             action=action,
-            num_iter=self.num_iter,
             start_time=self.current_time,
             time_step=self.time_step,
             Volume=self.Volume,

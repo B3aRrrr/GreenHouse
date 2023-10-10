@@ -124,7 +124,6 @@ def _step_i_Soil(
     low_high_dict: Dict[str, np.ndarray],
     state: np.ndarray,
     action: np.ndarray,
-    num_iter: int,
     start_time: float,
     time_step: int,
     Volume: float = 8.5,
@@ -138,9 +137,9 @@ def _step_i_Soil(
             
         print('START "_step_i_Soil" profile')
 
-    end_time = start_time
+    end_time = start_time + time_step
     state_params = dict(zip(list(low_high_dict.keys()), state.tolist()))
-    dtime = time_step / num_iter
+    dtime = time_step
 
     [vel_growth, vel_fruiting, vel_water], vel_relief, T_air, phi_air = [V_i(dt=dtime, a_i=a_i, U=flow_vel) for a_i in action[:3]], V_i(dt=dtime, a_i=action[3], U=flow_relief), 16 + 14 * action[4], action[-1]
 
