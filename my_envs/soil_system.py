@@ -432,8 +432,10 @@ class SoilGreenHouse(gym.Env, EzPickle):
         self.state = np.array(list(new_state_params.values()))
         reward = self._get_reward(new_state_params, dV)
         info = {}
-
-        return self.state, reward, False, info  
+        done = False
+        if  self.current_time >= self._max_episode_steps:
+                done = True
+        return self.state, reward, done, info  
     
     def _get_reward(self, state_params,dV):     
       keys = self.optimal_space.keys()
