@@ -433,16 +433,16 @@ class SoilGreenHouse(gym.Env, EzPickle):
         info = {}
         done = False
         if  self.current_time >= self._max_episode_steps:
-                done = True
+            done = True
         return self.state, reward, done, info  
     
     def _get_reward(self, state_params,dV):     
       keys = self.optimal_space.keys()
       def calc_loc_rew(state_params,param_name,best_r,N_r):
           return np.clip(np.exp(-(state_params[param_name] - np.mean(self.optimal_space[param_name]))**2),-1,1)*best_r/N_r
-      reward_list = [calc_loc_rew(state_params,key,300,N_r=len(keys)) for key in keys if key != 'vel_assim']
-      reward_list.append(np.clip(np.exp(-(dV)**2),-1,1)*300/(len(keys)))
-      clipped_reward = np.clip(np.sum(reward_list), -300, 300)
+      reward_list = [calc_loc_rew(state_params,key,1,N_r=len(keys)) for key in keys if key != 'vel_assim']
+      reward_list.append(np.clip(np.exp(-(dV)**2),-1,1)*1/(len(keys)))
+      clipped_reward = np.clip(np.sum(reward_list), -1, 1)
       
       return clipped_reward
     def render(self, mode='human'):

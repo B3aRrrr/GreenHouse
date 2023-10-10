@@ -188,4 +188,4 @@ def _step_i_Soil(
             
         print('END "_step_i_Soil" profile')
 
-    return state_params, end_time, Volume + N1 + N2 + N3 - N_relief
+    return state_params, end_time, (N1 + N2 + N3 - N_relief)/Volume
