@@ -4,10 +4,10 @@ from numba import jit
 from typing import Dict
 import cProfile as cProfile
 
-GRID_SIZE = 100
+GRID_SIZE = 1000
 ZERO_PADDING = 1e-6
-THERMAL_CONDUCTIVITY = 1.0
-HEAT_EXCHANGE_COEFF = 0.1
+THERMAL_CONDUCTIVITY = np.array([2.2,2.3])
+HEAT_EXCHANGE_COEFF = np.array([0.5,0.7])
 k_assim = {
         'N': np.array([0.5, 2]),
         'P': np.array([0.01, 0.1]),
@@ -43,7 +43,7 @@ def heat_equation(t, T, r, z, alpha_r, alpha_z, T_air):
 
 def temp_soil(dt, T_soil_0, R=0.35, h=0.35, T_air=299, _lambda=None):
     if _lambda is None:
-        _lambda = THERMAL_CONDUCTIVITY
+        _lambda = np.random.uniform(THERMAL_CONDUCTIVITY[0],THERMAL_CONDUCTIVITY[1])
 
     r = np.linspace(ZERO_PADDING, R, GRID_SIZE)
     z = np.linspace(ZERO_PADDING, h, GRID_SIZE)
@@ -85,18 +85,6 @@ def e_a(RH: float, e_s: float) -> float:
     return RH * e_s
 
 
-def calculate_diff_eq(dt, RH, AH, T_air, k=None, K=None, c_p=1005, lmbda=2.45e6, R_in=150, R_out=75, A=769366.9):
-    if k is None:
-        k = np.random.uniform(0.5, 2)
-    if K is None:
-        K = np.random.uniform(0.1, 10)
-
-    _e_s = e_s(T_air)
-    _e_a = e_a(RH, _e_s)
-    diff_eq_result = dt * (k * (RH - AH) * A - (K * (_e_s - _e_a) + (c_p * (R_in - R_out)) / lmbda))
-
-    return np.clip(diff_eq_result, -1e10, 1e10)
-
 @jit(nopython=True)
 def pH(pH_solution, pH_soil, dt):
     delta_pH = (pH_solution - pH_soil) * dt
@@ -109,8 +97,7 @@ def calculate_delta_EC_TDS(EC_TDS_solution, EC_TDS_soil, k_assim_EC_TDS, dt):
 
 @jit(nopython=True)
 def calculate_concentration_change(C_soil, C_solution, k_assim, dt):
-    delta_C = (C_solution - C_soil) * k_assim * dt
-    return delta_C
+    return (C_solution - C_soil) * k_assim * dt
 
 @jit(nopython=True)
 def V_i(dt, a_i: float = 0.5, U: float = 15):
