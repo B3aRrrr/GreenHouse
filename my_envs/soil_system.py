@@ -398,7 +398,7 @@ class SoilGreenHouse(gym.Env, EzPickle):
     ):
         super().reset(seed=seed) 
         self.current_time=0
-        return self.observation_space.sample(), {}        
+        return self.observation_space.sample()       
     
     def step(self, action: np.ndarray,isProfile:False):
         if isProfile:
