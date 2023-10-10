@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 import numpy as np
 from scipy.integrate import solve_ivp
 from numba import jit
@@ -145,52 +144,44 @@ def _step_i_Soil(
 
     [vel_growth, vel_fruiting, vel_water], vel_relief, T_air, phi_air = [V_i(dt=dtime, a_i=a_i, U=flow_vel) for a_i in action[:3]], V_i(dt=dtime, a_i=action[3], U=flow_relief), 16 + 14 * action[4], action[-1]
 
-    N1_gen, N2_gen, N3_gen, N_relief_gen = 0, 0, 0, 0
+    
+    N1, N2, N3, N_relief = [vel * dtime for vel in [vel_growth, vel_fruiting, vel_water, vel_relief]]
+    N_relief += np.random.uniform(vel_assim[0], vel_assim[1]) * dtime
 
-    for i in range(num_iter):
-        N1, N2, N3, N_relief = [vel * dtime for vel in [vel_growth, vel_fruiting, vel_water, vel_relief]]
-        N_relief += np.random.uniform(vel_assim[0], vel_assim[1]) * dtime
+    for elem in ['N', 'P', 'K', 'Mg', 'Ca', 'pH']:
+        state_params[f'{elem}_mix'] += (sum([valve[elem] * N for N, valve in zip([N1, N2, N3], [valve_growth, valve_fruiting, valve_water])]) - N_relief * state_params[f'{elem}_mix']) / (sum([N1, N2, N3]) - N_relief)
+        state_params[f'{elem}_mix'] = np.clip(state_params[f'{elem}_mix'], low_high_dict[f'{elem}_mix'][0], low_high_dict[f'{elem}_mix'][1])
 
-        for elem in ['N', 'P', 'K', 'Mg', 'Ca', 'pH']:
-            state_params[f'{elem}_mix'] += (sum([valve[elem] * N for N, valve in zip([N1, N2, N3], [valve_growth, valve_fruiting, valve_water])]) - N_relief * state_params[f'{elem}_mix']) / (sum([N1, N2, N3]) - N_relief)
-            state_params[f'{elem}_mix'] = np.clip(state_params[f'{elem}_mix'], low_high_dict[f'{elem}_mix'][0], low_high_dict[f'{elem}_mix'][1])
+    state_params['EC_mix'] = (Volume * state_params['EC_mix'] + N1 * valve_growth['EC'] + N2 * valve_fruiting['EC'] + N3 * valve_water['EC'] - N_relief * state_params['EC_mix']) / (Volume + N1 + N2 + N3 - N_relief)
+    state_params['EC_mix'] = np.clip(state_params[f'EC_mix'], low_high_dict[f'EC_mix'][0], low_high_dict[f'EC_mix'][1])
 
-        state_params['EC_mix'] = (Volume * state_params['EC_mix'] + N1 * valve_growth['EC'] + N2 * valve_fruiting['EC'] + N3 * valve_water['EC'] - N_relief * state_params['EC_mix']) / (Volume + N1 + N2 + N3 - N_relief)
-        state_params['EC_mix'] = np.clip(state_params[f'EC_mix'], low_high_dict[f'EC_mix'][0], low_high_dict[f'EC_mix'][1])
+    state_params['T_soil'] = temp_soil(dt=dtime, T_soil_0=state_params['T_soil'], T_air=T_air)
 
-        state_params['T_soil'] = temp_soil(dt=dtime, T_soil_0=state_params['T_soil'], T_air=T_air)
+    state_params['phi_soil'] += calculate_diff_eq(
+        dt=dtime,
+        RH=state_params['phi_soil'],
+        AH=phi_air, T_air=T_air
+    )
+    state_params['phi_soil'] = np.clip(state_params['phi_soil'], low_high_dict['phi_soil'][0], low_high_dict['phi_soil'][1])
 
-        state_params['phi_soil'] += calculate_diff_eq(
-            dt=dtime,
-            RH=state_params['phi_soil'],
-            AH=phi_air, T_air=T_air
-        )
-        state_params['phi_soil'] = np.clip(state_params['phi_soil'], low_high_dict['phi_soil'][0], low_high_dict['phi_soil'][1])
+    state_params['pH_soil'] += pH(pH_solution=state_params['pH_mix'],
+                                pH_soil=state_params['pH_soil'], dt=dtime)
+    state_params['pH_soil'] = np.clip(state_params['pH_soil'], low_high_dict['pH_soil'][0], low_high_dict['pH_soil'][1])
 
-        state_params['pH_soil'] += pH(pH_solution=state_params['pH_mix'],
-                                      pH_soil=state_params['pH_soil'], dt=dtime)
-        state_params['pH_soil'] = np.clip(state_params['pH_soil'], low_high_dict['pH_soil'][0], low_high_dict['pH_soil'][1])
+    state_params['EC_soil'] += calculate_delta_EC_TDS(
+        EC_TDS_solution=state_params['EC_mix'],
+        EC_TDS_soil=state_params['EC_soil'],
+        k_assim_EC_TDS=np.random.uniform(k_assim['EC'][0], k_assim['EC'][1]), dt=dtime
+    )
 
-        state_params['EC_soil'] += calculate_delta_EC_TDS(
-            EC_TDS_solution=state_params['EC_mix'],
-            EC_TDS_soil=state_params['EC_soil'],
-            k_assim_EC_TDS=np.random.uniform(k_assim['EC'][0], k_assim['EC'][1]), dt=dtime
-        )
+    state_params['EC_soil'] = np.clip(state_params['EC_soil'], low_high_dict['EC_soil'][0], low_high_dict['EC_soil'][1])
 
-        state_params['EC_soil'] = np.clip(state_params['EC_soil'], low_high_dict['EC_soil'][0], low_high_dict['EC_soil'][1])
+    for elem in ['N', 'P', 'K', 'Mg', 'Ca']:
+        state_params[f'{elem}_soil'] += calculate_concentration_change(
+            C_soil=state_params[f'{elem}_soil'], C_solution=state_params[f'{elem}_mix'],
+            k_assim=np.random.uniform(k_assim[elem][0], k_assim[elem][1]), dt=dtime)
 
-        for elem in ['N', 'P', 'K', 'Mg', 'Ca']:
-            state_params[f'{elem}_soil'] += calculate_concentration_change(
-                C_soil=state_params[f'{elem}_soil'], C_solution=state_params[f'{elem}_mix'],
-                k_assim=np.random.uniform(k_assim[elem][0], k_assim[elem][1]), dt=dtime)
-
-            state_params[f'{elem}_soil'] = np.clip(state_params[f'{elem}_soil'], low_high_dict[f'{elem}_soil'][0], low_high_dict[f'{elem}_soil'][1])
-
-        N1_gen += N1
-        N2_gen += N2
-        N3_gen += N3
-        N_relief_gen += N_relief
-        end_time += dtime
+        state_params[f'{elem}_soil'] = np.clip(state_params[f'{elem}_soil'], low_high_dict[f'{elem}_soil'][0], low_high_dict[f'{elem}_soil'][1])
 
     if isProfile:
         profiler.disable()
@@ -198,62 +189,4 @@ def _step_i_Soil(
             
         print('END "_step_i_Soil" profile')
 
-    return state_params, end_time, Volume + N1_gen + N2_gen + N3_gen - N_relief_gen
-=======
-import numpy as np
-from scipy import integrate
-
-def calc_T_soil(
-    dt:float,T_soil_0:float,
-    R:float=0.35,h:float=0.35,
-    T_air:float=299,
-    _lambda:float=np.random.uniform(0.8,1.16)) -> np.ndarray(shape=(1,),dtype=np.float64):
-    """
-        Данный метод используется для расчета 
-        точного значения средней температуры в 
-        цилиндрическом горшке с радиусом R и высотой h. 
-        Формула учитывает разницу в начальной температуре 
-        Tₐ и конечной температуре Tᵢ, 
-        а также время t, прошедшее
-        с момента начала нагрева или охлаждения.
-
-        Args:
-            dt (float): Time. Measured in sec.
-            T_air (float): Soi temperature (old). Measured in K;
-            R (float): Radius of the cylindrical pot. Measured in meters. Default to 0.35; 
-            h (float): Height of the cylindrical pot. Measured in meters. Default to 0.35; 
-            T_air (float): Air temperature. Measured in K. Defaults to 26+273;
-            _lambda(float): Coefficient of thermal conductivity. Measured in W/(m*K). Defaults to np.random.uniform(0.8,1.16);
-        Result:
-            np.ndarray(shape=(1,),dtype=np.float64) Calculated temperature of soil in the pot and an estimate of the error.
-    """
-         
-    f = lambda r, theta: T_air + (T_soil_0 - T_air) * np.sin(theta) * r/np.exp(_lambda**2 * dt)
-    mu,sigma = 1/(2*np.pi*R*h)*np. asarray(integrate.dblquad(f, 0, R, 0, 2*np.pi))
-    return np.random.normal(mu, sigma, 1)
-
-def e_s(T_air:float) -> float:
-    """
-    Насыщенное парциальное давление воды при данной температуре
-
-    Args:
-    T_air (float): температура в градусах Цельсия
-
-    Returns:
-    float: Насыщенное парциальное давление воды при данной температуре
-
-    """
-    return 0.6108 * np.exp(17.27*T_air / (T_air + 237.3))
-def e_a(RH:float,e_s:float) -> float:
-    """
-    Формула для расчета фактического парциального давления воды e_a 
-    при данной температуре и относительной влажности RH
-    Args:
-        RH (float): относительной влажности
-        e_s (float): Насыщенное парциальное давление воды при данной температуре
-
-    Returns:
-        float:  фактическое парциальное давление воды
-    """
-    return RH * e_s
->>>>>>> 7801a6405ab59690a91b1a87582234b159f218ee
+    return state_params, end_time, Volume + N1 + N2 + N3 - N_relief
