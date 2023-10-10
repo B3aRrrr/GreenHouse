@@ -386,7 +386,7 @@ class SoilGreenHouse(gym.Env, EzPickle):
         self.flow_relief = flow_relief
         self.current_time=0
         
-        self.state, _ = self.reset()
+        self.state  = self.reset()
         self.num_iter = num_iter
         self.A=A     
         
