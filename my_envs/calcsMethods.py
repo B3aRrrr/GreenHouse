@@ -4,7 +4,7 @@ from numba import jit
 from typing import Dict
 import cProfile as cProfile
 
-GRID_SIZE = 1000
+GRID_SIZE = 100
 ZERO_PADDING = 1e-6
 THERMAL_CONDUCTIVITY = np.array([2.2,2.3])
 HEAT_EXCHANGE_COEFF = np.array([0.5,0.7])
@@ -36,7 +36,8 @@ def heat_equation(t, T, r, z, alpha_r, alpha_z, T_air):
     
     dT_dr = alpha_r * (1 / r) * calculate_gradient(r * calculate_gradient(T.reshape((GRID_SIZE, GRID_SIZE)), axis=1), axis=1)
     dT_dz = alpha_z * (1 / z) * calculate_gradient(calculate_gradient(T.reshape((GRID_SIZE, GRID_SIZE)), axis=0), axis=0)
-    heat_exchange = (T_air - T) * HEAT_EXCHANGE_COEFF
+    print(np.random.uniform(HEAT_EXCHANGE_COEFF[0],HEAT_EXCHANGE_COEFF[1]).shape)
+    heat_exchange = (T_air - T) * np.random.uniform(HEAT_EXCHANGE_COEFF[0],HEAT_EXCHANGE_COEFF[1])
     dT_dt = (dT_dr + dT_dz).flatten() + heat_exchange.flatten()
     return dT_dt
 
